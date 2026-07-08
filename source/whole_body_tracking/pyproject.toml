@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools", "wheel", "toml"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whole_body_tracking"
+version = "0.1.0"
+description = "Whole-body motion tracking for Tienkung2 Pro based on Isaac Lab"
+requires-python = ">=3.10"
+
+# Core dependencies — versions reflect what is installed in the mimic conda env.
+# Isaac Lab / Isaac Sim packages are installed from source and not listed here.
+dependencies = [
+    # Deep learning
+    "torch>=2.7.0",
+    # RL framework
+    "rsl-rl-lib>=2.3.1",
+    # Simulation
+    "gymnasium>=1.0.0",
+    "mujoco>=3.0.0",
+    "mujoco-python-viewer>=0.1.4",
+    # ONNX export & inference
+    "onnx>=1.14.0",
+    "onnxruntime-gpu>=1.16.0",
+    # Numerics
+    "numpy>=1.24.0",
+    "numpy-quaternion>=2022.0.0",
+    "scipy>=1.10.0",
+    # Logging
+    "tensorboard>=2.13.0",
+    "wandb>=0.15.0",
+    # Utilities
+    "packaging>=23.0",
+]
+
+[project.optional-dependencies]
+teleop = [
+    "pynput>=1.7.0",
+]

@@ -1,0 +1,16 @@
+torch>=2.7.0
+rsl-rl-lib>=2.3.1
+gymnasium>=1.0.0
+mujoco>=3.0.0
+mujoco-python-viewer>=0.1.4
+onnx>=1.14.0
+onnxruntime-gpu>=1.16.0
+numpy>=1.24.0
+numpy-quaternion>=2022.0.0
+scipy>=1.10.0
+tensorboard>=2.13.0
+wandb>=0.15.0
+packaging>=23.0
+
+[teleop]
+pynput>=1.7.0

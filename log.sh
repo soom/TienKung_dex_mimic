@@ -1,0 +1,1 @@
+watch -n 1 python scripts/analyze_training_log.py

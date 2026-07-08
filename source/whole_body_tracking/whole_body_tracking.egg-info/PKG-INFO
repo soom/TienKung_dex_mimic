@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: whole_body_tracking
+Version: 0.1.0
+Summary: Whole-body motion tracking for Tienkung2 Pro based on Isaac Lab
+Requires-Python: >=3.10
+Requires-Dist: torch>=2.7.0
+Requires-Dist: rsl-rl-lib>=2.3.1
+Requires-Dist: gymnasium>=1.0.0
+Requires-Dist: mujoco>=3.0.0
+Requires-Dist: mujoco-python-viewer>=0.1.4
+Requires-Dist: onnx>=1.14.0
+Requires-Dist: onnxruntime-gpu>=1.16.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: numpy-quaternion>=2022.0.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: tensorboard>=2.13.0
+Requires-Dist: wandb>=0.15.0
+Requires-Dist: packaging>=23.0
+Provides-Extra: teleop
+Requires-Dist: pynput>=1.7.0; extra == "teleop"
