@@ -2,7 +2,7 @@
 
 基于 NVIDIA Isaac Lab 的全身运动跟踪强化学习训练框架。策略网络以**残差关节位置**（residual joint position）的形式输出动作，叠加在参考运动数据上，通过 PPO 训练使仿人机器人复现参考动作。
 
-<video src="mimic.mp4" controls width="100%"></video>
+<video controls width="100%" src="https://github.com/user-attachments/assets/3f8b4aa4-edd3-4b71-be1f-2cdad4333444"></video>
 
 ## 环境要求
 
