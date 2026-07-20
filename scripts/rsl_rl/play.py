@@ -22,6 +22,10 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--motion_file", type=str, default=None, help="Path to the motion file.")
+parser.add_argument(
+    "--checkpoint_path", type=str, default=None,
+    help="Direct path to the tracking checkpoint. Overrides --load_run/--checkpoint.",
+)
 parser.add_argument("--max_steps", type=int, default=None, help="Maximum number of environment steps to play.")
 parser.add_argument(
     "--start_first_frame",
@@ -41,7 +45,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--standing_checkpoint", type=str, default=None,
-    help="Standing head checkpoint filename (merged ONNX export).",
+    help="Standing checkpoint path, or filename when --standing_load_run is set.",
 )
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -288,7 +292,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
 
-    if args_cli.wandb_path:
+    if args_cli.checkpoint_path:
+        resume_path = os.path.abspath(os.path.expanduser(args_cli.checkpoint_path))
+        if not os.path.isfile(resume_path):
+            raise FileNotFoundError(f"Tracking checkpoint not found: {resume_path}")
+        print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+    elif args_cli.wandb_path:
         import wandb
 
         run_path = args_cli.wandb_path
@@ -379,7 +388,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # Merged standing + tracking ONNX export
     if args_cli.standing_checkpoint:
-        standing_ckpt = args_cli.standing_checkpoint
+        if args_cli.standing_load_run:
+            standing_experiment_name = agent_cfg.experiment_name.replace("_fix", "_standing")
+            standing_ckpt = os.path.join(
+                "logs", "rsl_rl", standing_experiment_name,
+                args_cli.standing_load_run, args_cli.standing_checkpoint,
+            )
+        else:
+            standing_ckpt = os.path.abspath(os.path.expanduser(args_cli.standing_checkpoint))
         if os.path.isfile(standing_ckpt):
             print(f"[INFO] Merging standing head from: {standing_ckpt}")
             export_motion_policy_merged_as_onnx(
@@ -393,7 +409,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none",
                                 export_model_dir, filename="policy_merged.onnx")
         else:
-            print(f"[WARN] Standing checkpoint not found: {standing_ckpt}")
+            raise FileNotFoundError(f"Standing checkpoint not found: {standing_ckpt}")
 
     if args_cli.start_first_frame:
         initialize_to_motion_frame(env.unwrapped, frame_idx=0)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dex EVT 动作跟踪训练脚本（Pro 训练策略，支持 TeleopTeacher）
+# Dex EVT Simple 动作跟踪训练脚本
 # 用法：bash train_dex.sh [smoke|medium|full] [motion_npz_or_dir] [num_gpus] [resume_run] [checkpoint]
 #
 # 示例：
@@ -8,12 +8,12 @@
 #   bash train_dex.sh full                               # 全量训练（默认 dataset/npz_dex）
 #   bash train_dex.sh full motions/dex_motion.npz 2      # 显式传 motion + GPU 数
 #   RESUME=true bash train_dex.sh full motions/dex_motion.npz 2 run_name model_500.pt
-#   TASK_ID=Tracking-Flat-DexEVT-TeleopTeacher-v0 bash train_dex.sh full motions/dex_motion.npz 2
+#   RESUME=false LOAD_CKPT=policy/dex/wbt_model_46400.pt bash train_dex.sh full
+#   TASK_ID=Tracking-Flat-DexEVT-Simple-v0 bash train_dex.sh full motions/dex_motion.npz 2
 #   EPISODE_LENGTH_CAP_S=12 bash train_dex.sh full motions/dex_motion.npz 2
 #
 # 说明：
-#   - 默认任务是 `Tracking-Flat-DexEVT-v0`
-#   - TeleopTeacher 任务 `Tracking-Flat-DexEVT-TeleopTeacher-v0`
+#   - 任务是 `Tracking-Flat-DexEVT-Simple-v0`
 #   - 支持 smoke / medium / full 三种规模
 #   - 多卡模式下使用 torchrun，将总 env 数均分
 #   - 可通过 EPISODE_LENGTH_S / EPISODE_LENGTH_CAP_S / EPISODE_LENGTH_SCALE 控制回合长度
@@ -22,21 +22,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DEFAULT_MOTION_FILE="dataset/npz_dex/body_check_101__A206_with_transition.npz"
+DEFAULT_MOTION_FILE="dataset/tmp_c1/cigarette_pick_up_R_002__A458_with_transition.npz"
 
 MODE="${1:-full}"
 MOTION_FILE="${2:-$DEFAULT_MOTION_FILE}"
 NUM_GPUS="${3:-${NUM_GPUS:-1}}"
 TASK_ID="${TASK_ID:-Tracking-Flat-DexEVT-Simple-v0}"
-RUN_PREFIX="${RUN_PREFIX:-dex_evt}"
+RUN_PREFIX="${RUN_PREFIX:-dex_evt_repair_balance_sim2sim}"
 RESUME="${RESUME:-false}"
 RESUME_RUN="${4:-${RESUME_RUN:-}}"
 RESUME_CHECKPOINT="${5:-${RESUME_CHECKPOINT:-}}"
+LOAD_CKPT="${LOAD_CKPT:-policy/dex/wbt_model_46400.pt}"
 EPISODE_LENGTH_S="${EPISODE_LENGTH_S:-}"
 EPISODE_LENGTH_CAP_S="${EPISODE_LENGTH_CAP_S:-24.64}"
 EPISODE_LENGTH_SCALE="${EPISODE_LENGTH_SCALE:-1.0}"
 CURRICULUM_INITIAL_STAGE="${CURRICULUM_INITIAL_STAGE:-2}"
-LOAD_CKPT="${LOAD_CKPT:-policy/wbt_model_46400.pt}"
 
 if [ ! -f "$MOTION_FILE" ] && [ ! -d "$MOTION_FILE" ]; then
     echo "[ERROR] Motion file not found: $MOTION_FILE"
@@ -55,6 +55,16 @@ fi
 
 if [[ "$RESUME" == "true" && ( -z "$RESUME_RUN" || -z "$RESUME_CHECKPOINT" ) ]]; then
     echo "[ERROR] RESUME=true requires resume_run and checkpoint arguments."
+    exit 1
+fi
+
+if [[ "$RESUME" == "true" && -n "$LOAD_CKPT" ]]; then
+    echo "[ERROR] RESUME and LOAD_CKPT are mutually exclusive."
+    exit 1
+fi
+
+if [[ -n "$LOAD_CKPT" && ! -f "$LOAD_CKPT" ]]; then
+    echo "[ERROR] LOAD_CKPT file not found: $LOAD_CKPT"
     exit 1
 fi
 
@@ -130,7 +140,7 @@ else
     echo " Resume     : disabled (from scratch)"
 fi
 if [[ -n "$LOAD_CKPT" ]]; then
-    echo " Load CKPT  : $LOAD_CKPT"
+    echo " Load CKPT  : $LOAD_CKPT (model weights only)"
 fi
 echo "========================================"
 
@@ -171,8 +181,8 @@ if (( NUM_GPUS > 1 )); then
         --distributed \
         "${EPISODE_ARGS[@]}" \
         --headless \
-        "${RESUME_ARGS[@]}" \
-        "${LOAD_CKPT_ARGS[@]}"
+        "${LOAD_CKPT_ARGS[@]}" \
+        "${RESUME_ARGS[@]}"
 else
     WBT_RUN_TIMESTAMP="$RUN_TIMESTAMP" \
     python scripts/rsl_rl/train.py \
@@ -183,8 +193,8 @@ else
         --run_name "${RUN_PREFIX}_${RUN_NAME}" \
         "${EPISODE_ARGS[@]}" \
         --headless \
-        "${RESUME_ARGS[@]}" \
-        "${LOAD_CKPT_ARGS[@]}"
+        "${LOAD_CKPT_ARGS[@]}" \
+        "${RESUME_ARGS[@]}"
 fi
 
 echo ""

@@ -44,6 +44,7 @@ from scipy.signal import savgol_filter
 # ---------------------------------------------------------------------------
 
 ROBOT_MJCF = {
+    "c1": "source/whole_body_tracking/whole_body_tracking/assets/walker_c1/mjcf/walker_astron.xml",
     "tienkung2_pro": "ros_deploy_pro/src/tienkung2_pro/assets/mjcf/tienkung_new.xml",
     "dex_evt": "source/whole_body_tracking/whole_body_tracking/assets/dex_evt/urdf/evt2.xml",
 }
@@ -57,6 +58,17 @@ _NPZ_TO_MJCF_BODY_DEX = {}  # dex body names match MJCF 1:1
 _MISSING_BODY_FALLBACK = "pelvis"
 
 ROBOT_JOINT_NAMES = {
+    "c1": [
+        "L_hip_pitch_joint", "L_hip_roll_joint", "L_hip_yaw_joint",
+        "L_knee_pitch_joint", "L_ankle_pitch_joint", "L_ankle_roll_joint",
+        "R_hip_pitch_joint", "R_hip_roll_joint", "R_hip_yaw_joint",
+        "R_knee_pitch_joint", "R_ankle_pitch_joint", "R_ankle_roll_joint",
+        "waist_yaw_joint", "waist_pitch_joint", "waist_roll_joint",
+        "L_shoulder_pitch_joint", "L_shoulder_roll_joint", "L_shoulder_yaw_joint",
+        "L_elbow_pitch_joint", "L_elbow_yaw_joint", "L_wrist_pitch_joint", "L_wrist_roll_joint",
+        "R_shoulder_pitch_joint", "R_shoulder_roll_joint", "R_shoulder_yaw_joint",
+        "R_elbow_pitch_joint", "R_elbow_yaw_joint", "R_wrist_pitch_joint", "R_wrist_roll_joint",
+    ],
     "tienkung2_pro": [
         "body_yaw_joint",
         "hip_roll_l_joint",
@@ -103,6 +115,17 @@ ROBOT_JOINT_NAMES = {
 
 # NPZ body_names in the order Isaac Sim exports them (must match training code)
 ROBOT_BODY_NAMES = {
+    "c1": [
+        "base_link", "L_hip_pitch_link", "L_hip_roll_link", "L_hip_yaw_link",
+        "L_knee_pitch_link", "L_ankle_pitch_link", "L_ankle_roll_link",
+        "R_hip_pitch_link", "R_hip_roll_link", "R_hip_yaw_link",
+        "R_knee_pitch_link", "R_ankle_pitch_link", "R_ankle_roll_link",
+        "waist_yaw_link", "waist_pitch_link", "waist_roll_link",
+        "L_shoulder_pitch_link", "L_shoulder_roll_link", "L_shoulder_yaw_link",
+        "L_elbow_pitch_link", "L_elbow_yaw_link", "L_wrist_pitch_link", "L_wrist_roll_link",
+        "R_shoulder_pitch_link", "R_shoulder_roll_link", "R_shoulder_yaw_link",
+        "R_elbow_pitch_link", "R_elbow_yaw_link", "R_wrist_pitch_link", "R_wrist_roll_link",
+    ],
     "tienkung2_pro": [
         "pelvis",
         "body_yaw_link",
@@ -156,6 +179,12 @@ ROBOT_BODY_NAMES = {
 # Standing poses (from robot init_state)
 # ---------------------------------------------------------------------------
 STANDING_JOINT_POS_MAP = {
+    "c1": {
+        "L_hip_pitch_joint": -0.05, "R_hip_pitch_joint": -0.05,
+        "L_knee_pitch_joint": 0.10, "R_knee_pitch_joint": 0.10,
+        "L_ankle_pitch_joint": -0.05, "R_ankle_pitch_joint": -0.05,
+        "L_shoulder_roll_joint": 0.1, "R_shoulder_roll_joint": -0.1,
+    },
     "tienkung2_pro": {
         "hip_pitch_l_joint":    -0.5,
         "hip_pitch_r_joint":    -0.5,
@@ -202,7 +231,7 @@ STANDING_JOINT_POS_MAP = {
     },
 }
 
-DEFAULT_MJCF = "ros_deploy_pro/src/tienkung2_pro/assets/mjcf/tienkung_new.xml"
+DEFAULT_MJCF = ROBOT_MJCF["c1"]
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +448,27 @@ def recompute_velocities_raw(
     return (joint_vel.astype(np.float32),
             body_lin_vel_w.astype(np.float32),
             body_ang_vel_w.astype(np.float32))
+
+
+def report_velocity_anomalies(joint_vel, body_lin_vel_w, body_ang_vel_w,
+                              joint_names, fps, label="motion"):
+    """Print actionable diagnostics for implausible or non-finite velocities."""
+    print(f"[velocity_check] {label}: joint max={np.nanmax(np.abs(joint_vel)):.2f} rad/s, "
+          f"root lin max={np.nanmax(np.linalg.norm(body_lin_vel_w[:, 0], axis=1)):.2f} m/s, "
+          f"root ang max={np.nanmax(np.linalg.norm(body_ang_vel_w[:, 0], axis=1)):.2f} rad/s")
+    bad = ~np.isfinite(joint_vel).all(axis=1)
+    speed = np.abs(joint_vel)
+    spikes = np.argwhere(speed > 20.0)
+    root_lin = np.linalg.norm(body_lin_vel_w[:, 0], axis=1)
+    root_ang = np.linalg.norm(body_ang_vel_w[:, 0], axis=1)
+    root_bad = np.where((root_lin > 10.0) | (root_ang > 30.0))[0]
+    if bad.any():
+        print(f"[velocity_check][异常] {label}: 第 {np.where(bad)[0][:10].tolist()} 帧含 NaN/Inf；原因通常是输入缺失或四元数非法")
+    if len(spikes):
+        shown = [(int(t), joint_names[int(j)], float(speed[t, j])) for t, j in spikes[:10]]
+        print(f"[velocity_check][异常] {label}: 关节速度超过 20 rad/s: {shown}; 可能是原始帧跳变或插值尖峰")
+    if len(root_bad):
+        print(f"[velocity_check][异常] {label}: 根部速度异常帧 {root_bad[:10].tolist()}; 可能是根轨迹跳变或坐标系不连续")
 
 
 # ---------------------------------------------------------------------------
@@ -674,7 +724,9 @@ def add_transition_to_npz(
     w, x, y, z = first_quat
     first_yaw = float(np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)))
     # Auto-detect robot type from joint names for standing pose
-    if "waist_yaw_joint" in joint_names:
+    if "L_hip_pitch_joint" in joint_names:
+        stand_map = STANDING_JOINT_POS_MAP["c1"]
+    elif "waist_yaw_joint" in joint_names:
         stand_map = STANDING_JOINT_POS_MAP["dex_evt"]
     else:
         stand_map = STANDING_JOINT_POS_MAP["tienkung2_pro"]
@@ -878,6 +930,7 @@ def convert_single(
         body_quat_w=body_quat_w,
         fps=float(output_fps),
     )
+    report_velocity_anomalies(joint_vel, body_lin_vel_w, body_ang_vel_w, joint_names, output_fps, input_file)
 
     out_path = output_name if output_name.endswith(".npz") else output_name + ".npz"
     np.savez(
@@ -914,7 +967,7 @@ def main():
                         help="Where to write final NPZ files in batch mode (default: <batch_dir>/../npz_pro)")
 
     # ── Robot / MJCF ────────────────────────────────────────────────────────
-    parser.add_argument("--robot",  default="tienkung2_pro", choices=list(ROBOT_MJCF.keys()))
+    parser.add_argument("--robot",  default="c1", choices=list(ROBOT_MJCF.keys()))
     parser.add_argument("--mjcf",   default=None, help="Override MJCF path")
     parser.add_argument("--input_fps",  type=int, default=30)
     parser.add_argument("--output_fps", type=int, default=50)

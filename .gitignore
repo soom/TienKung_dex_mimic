@@ -1,0 +1,3 @@
+*.zip
+*.pyc
+source/whole_body_tracking/whole_body_tracking.egg-info

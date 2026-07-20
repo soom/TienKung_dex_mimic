@@ -2,6 +2,9 @@ import gymnasium as gym
 
 from . import agents, simple_env_cfg
 
+##
+# Register Gym environments for Dex EVT.
+##
 
 gym.register(
     id="Tracking-Flat-DexEVT-Simple-v0",

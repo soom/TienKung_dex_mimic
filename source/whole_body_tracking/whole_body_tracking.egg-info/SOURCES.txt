@@ -7,6 +7,7 @@ whole_body_tracking.egg-info/requires.txt
 whole_body_tracking.egg-info/top_level.txt
 whole_body_tracking/assets/__init__.py
 whole_body_tracking/robots/dex_evt.py
+whole_body_tracking/robots/walker_c1.py
 whole_body_tracking/tasks/__init__.py
 whole_body_tracking/tasks/tracking/__init__.py
 whole_body_tracking/tasks/tracking/tracking_env_cfg.py
@@ -14,7 +15,10 @@ whole_body_tracking/tasks/tracking/config/__init__.py
 whole_body_tracking/tasks/tracking/config/dex_evt/__init__.py
 whole_body_tracking/tasks/tracking/config/dex_evt/simple_env_cfg.py
 whole_body_tracking/tasks/tracking/config/dex_evt/agents/rsl_rl_ppo_cfg.py
-whole_body_tracking/tasks/tracking/config/dex_evt/agents/rsl_rl_ppo_standing_cfg.py
+whole_body_tracking/tasks/tracking/config/walker_c1/__init__.py
+whole_body_tracking/tasks/tracking/config/walker_c1/simple_env_cfg.py
+whole_body_tracking/tasks/tracking/config/walker_c1/agents/__init__.py
+whole_body_tracking/tasks/tracking/config/walker_c1/agents/rsl_rl_ppo_cfg.py
 whole_body_tracking/tasks/tracking/mdp/__init__.py
 whole_body_tracking/tasks/tracking/mdp/actions.py
 whole_body_tracking/tasks/tracking/mdp/actuators.py

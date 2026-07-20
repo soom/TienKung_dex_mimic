@@ -3,10 +3,9 @@
 # 用法：bash play_dex.sh
 #
 # 环境变量覆盖：
-#   TASK                   — Gym 任务 ID（默认 Tracking-Flat-DexEVT-v0）
+#   TASK                   — Gym 任务 ID（默认 Tracking-Flat-DexEVT-Simple-v0）
 #   MOTION_FILE            — 动作 NPZ 文件路径
-#   LOAD_RUN               — 训练运行的 run 名称
-#   CHECKPOINT             — 模型文件名（如 model_500.pt）
+#   CHECKPOINT_PATH        — 基础模型路径
 #   NUM_ENVS               — 并行 env 数（默认 1）
 #   START_FIRST_FRAME=1    — 强制从 motion 首帧开始
 #   EXPORT_ROLLOUT=1       — 导出 rollout 为 NPZ
@@ -19,9 +18,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 TASK="${TASK:-Tracking-Flat-DexEVT-Simple-v0}"
-MOTION_FILE="${MOTION_FILE:-dataset/npz_dex/body_check_101__A206_with_transition.npz}"
-LOAD_RUN="${LOAD_RUN:-0707_230600_dex_evt_full}"
-CHECKPOINT="${CHECKPOINT:-model_1400.pt}"
+MOTION_FILE="${MOTION_FILE:-dataset/npz_dex/body_search_003__A097_with_transition.npz}"
+CHECKPOINT_PATH="${CHECKPOINT_PATH:-policy/dex/wbt_model_46400.pt}"
 NUM_ENVS="${NUM_ENVS:-1}"
 START_FIRST_FRAME="${START_FIRST_FRAME:-1}"
 HEADLESS="${HEADLESS:-0}"
@@ -31,23 +29,23 @@ MAX_STEPS="${MAX_STEPS:-}"
 EXPORT_ROLLOUT="${EXPORT_ROLLOUT:-0}"
 COMPARE_AFTER_EXPORT="${COMPARE_AFTER_EXPORT:-0}"
 
-STANDING_CHECKPOINT="${STANDING_CHECKPOINT:-policy/standing_model_2000.pt}"
+STANDING_CHECKPOINT="${STANDING_CHECKPOINT:-policy/dex/standing_model_2000.pt}"
 
-ANALYSIS_DIR="${ANALYSIS_DIR:-logs/rsl_rl/dex_evt_fix/$LOAD_RUN/analysis}"
-EXPORT_ROLLOUT_NPZ="${EXPORT_ROLLOUT_NPZ:-$ANALYSIS_DIR/rollout_${CHECKPOINT%.pt}.npz}"
+ANALYSIS_DIR="${ANALYSIS_DIR:-outputs/play_dex}"
+EXPORT_ROLLOUT_NPZ="${EXPORT_ROLLOUT_NPZ:-$ANALYSIS_DIR/rollout_$(basename "${CHECKPOINT_PATH%.pt}").npz}"
 
 if [[ ! -f "$MOTION_FILE" ]]; then
     echo "[ERROR] Motion file not found: $MOTION_FILE"
     exit 1
 fi
 
-if [[ -z "$LOAD_RUN" ]]; then
-    echo "[ERROR] LOAD_RUN must be set (run name in logs/rsl_rl/dex_evt_fix/)."
+if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    echo "[ERROR] Tracking checkpoint not found: $CHECKPOINT_PATH"
     exit 1
 fi
 
-if [[ ! -f "logs/rsl_rl/dex_evt_fix/$LOAD_RUN/$CHECKPOINT" ]]; then
-    echo "[ERROR] Checkpoint not found: logs/rsl_rl/dex_evt_fix/$LOAD_RUN/$CHECKPOINT"
+if [[ -n "$STANDING_CHECKPOINT" && ! -f "$STANDING_CHECKPOINT" ]]; then
+    echo "[ERROR] Standing checkpoint not found: $STANDING_CHECKPOINT"
     exit 1
 fi
 
@@ -56,19 +54,17 @@ echo " Dex EVT Playback"
 echo "========================================"
 echo " Task      : $TASK"
 echo " Motion    : $MOTION_FILE"
-echo " Load run  : $LOAD_RUN"
-echo " Checkpoint: $CHECKPOINT"
+echo " Tracking  : $CHECKPOINT_PATH"
 echo " Num envs  : $NUM_ENVS"
 echo " Start@0   : $START_FIRST_FRAME"
 echo " Export    : $EXPORT_ROLLOUT"
-echo " Standing  : ${STANDING_CHECKPOINT:-}"
+echo " Standing  : $STANDING_CHECKPOINT"
 echo "========================================"
 
 PLAY_ARGS=(
     --task "$TASK"
     --motion_file "$MOTION_FILE"
-    --load_run "$LOAD_RUN"
-    --checkpoint "$CHECKPOINT"
+    --checkpoint_path "$CHECKPOINT_PATH"
     --num_envs "$NUM_ENVS"
 )
 
@@ -88,9 +84,7 @@ if [[ -n "$MAX_STEPS" ]]; then
     PLAY_ARGS+=(--max_steps "$MAX_STEPS")
 fi
 
-if [[ -n "$STANDING_CHECKPOINT" ]]; then
-    PLAY_ARGS+=( --standing_checkpoint "$STANDING_CHECKPOINT" )
-fi
+PLAY_ARGS+=(--standing_checkpoint "$STANDING_CHECKPOINT")
 
 if [[ "$EXPORT_ROLLOUT" == "1" ]]; then
     mkdir -p "$ANALYSIS_DIR"
@@ -98,3 +92,11 @@ if [[ "$EXPORT_ROLLOUT" == "1" ]]; then
 fi
 
 python scripts/rsl_rl/play.py "${PLAY_ARGS[@]}" --headless
+
+if [[ "$EXPORT_ROLLOUT" == "1" && "$COMPARE_AFTER_EXPORT" == "1" ]]; then
+    echo ""
+    echo "========================================"
+    echo " Rollout Comparison"
+    echo "========================================"
+    python scripts/compare_rollout_npz.py "$EXPORT_ROLLOUT_NPZ" --motion_file "$MOTION_FILE" --top_joints 0
+fi

@@ -20,6 +20,12 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
 
+def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    mat = matrix_from_quat(command.robot_anchor_quat_w)
+    return mat[..., :2].reshape(mat.shape[0], -1)
+
+
 def robot_anchor_lin_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.robot_anchor_lin_vel_w.view(env.num_envs, -1)
@@ -145,6 +151,46 @@ def motion_phase(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     return torch.stack([angle.sin(), angle.cos()], dim=-1)
 
 
+def wrist_ee_pos_error_b(
+    env: ManagerBasedEnv,
+    command_name: str,
+    wrist_body_names: list[str] | None = None,
+) -> torch.Tensor:
+    """Wrist EE position error in anchor-local frame: robot_wrist_pos - ref_wrist_pos.
+
+    Shape: (num_envs, 3 * len(wrist_body_names)).
+    Provides the policy a direct signal of how far each wrist is from its reference.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    if wrist_body_names is None:
+        wrist_body_names = ["wrist_roll_l_link", "wrist_roll_r_link"]
+    body_indexes = [i for i, name in enumerate(command.cfg.body_names) if name in wrist_body_names]
+    error = command.robot_body_pos_w[:, body_indexes] - command.body_pos_relative_w[:, body_indexes]
+    return error.reshape(env.num_envs, -1)
+
+
+def wrist_ee_ori_error_b(
+    env: ManagerBasedEnv,
+    command_name: str,
+    wrist_body_names: list[str] | None = None,
+) -> torch.Tensor:
+    """Wrist EE orientation error magnitude (scalar per wrist).
+
+    Shape: (num_envs, len(wrist_body_names)).
+    """
+    from isaaclab.utils.math import quat_error_magnitude
+
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    if wrist_body_names is None:
+        wrist_body_names = ["wrist_roll_l_link", "wrist_roll_r_link"]
+    body_indexes = [i for i, name in enumerate(command.cfg.body_names) if name in wrist_body_names]
+    error = quat_error_magnitude(
+        command.body_quat_relative_w[:, body_indexes],
+        command.robot_body_quat_w[:, body_indexes],
+    )
+    return error.reshape(env.num_envs, -1)
+
+
 def motion_anchor_lookahead(
     env: ManagerBasedEnv,
     command_name: str,
@@ -177,3 +223,20 @@ def motion_anchor_lookahead(
     return torch.cat(future_obs, dim=-1)
 
 
+def phase_mode_onehot(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Return a (num_envs, 2) one-hot encoding of the current phase mode.
+
+    Phases (indices): 0=STAND, 1=TRACKING.
+    If the `MotionCommand` does not provide `phase_mode`, default to STAND.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    num_envs = env.num_envs
+
+    mode = getattr(command, "phase_mode", None)
+    if mode is None:
+        idx = torch.zeros(num_envs, dtype=torch.long, device=env.device)
+    else:
+        idx = torch.as_tensor(mode, dtype=torch.long, device=env.device).view(-1).clamp(min=0, max=1)
+
+    onehot = torch.nn.functional.one_hot(idx, num_classes=2).to(torch.float32)
+    return onehot

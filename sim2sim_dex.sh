@@ -14,10 +14,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-POLICY="${POLICY:-logs/rsl_rl/dex_evt_fix/0707_230600_dex_evt_full/exported/policy_merged.onnx}"
+POLICY="${POLICY:-logs/rsl_rl/dex_evt_fix/0704_130014_dex_evt_repair_balance_sim2sim_full/exported/policy_merged.onnx}"
 
 # ── 默认 NPZ 目录 ──────────────────────────────────────────────────────────
-DEFAULT_NPZ_DIR="dataset/tmp"
+DEFAULT_NPZ_DIR="dataset/tmp/new"
 NPZ_DIR="${NPZ_DIR:-$DEFAULT_NPZ_DIR}"
 
 # ── 默认 MJCF ──────────────────────────────────────────────────────────────

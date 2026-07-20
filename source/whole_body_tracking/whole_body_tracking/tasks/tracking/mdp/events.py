@@ -26,8 +26,11 @@ def randomize_joint_default_pos(
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
 
-    # save nominal value for export
-    asset.data.default_joint_pos_nominal = torch.clone(asset.data.default_joint_pos[0])
+    # Save the unrandomized pose exactly once for ONNX export.  This event can
+    # run multiple times (for example all joints, then ankles); overwriting it
+    # later would export an already-randomized pose as the nominal default.
+    if getattr(asset.data, "default_joint_pos_nominal", None) is None:
+        asset.data.default_joint_pos_nominal = torch.clone(asset.data.default_joint_pos[0])
 
     # resolve environment ids
     if env_ids is None:

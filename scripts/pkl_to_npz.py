@@ -45,6 +45,7 @@ from csv_to_npz_mujoco import (
     ROBOT_MJCF,
     add_transition_to_npz,
     recompute_velocities_raw,
+    report_velocity_anomalies,
     run_fk,
     _recompute_body_velocities_file,
 )
@@ -81,6 +82,19 @@ DEX_PKL_JOINT_ORDER = [
     "shoulder_pitch_r_joint", "shoulder_roll_r_joint", "shoulder_yaw_r_joint",
     "elbow_pitch_r_joint", "elbow_yaw_r_joint",
     "wrist_pitch_r_joint", "wrist_roll_r_joint",
+]
+
+# Walker C1 PKL order (29 DOF, matching the C1 dataset exports).
+C1_PKL_JOINT_ORDER = [
+    "L_hip_pitch_joint", "L_hip_roll_joint", "L_hip_yaw_joint",
+    "L_knee_pitch_joint", "L_ankle_pitch_joint", "L_ankle_roll_joint",
+    "R_hip_pitch_joint", "R_hip_roll_joint", "R_hip_yaw_joint",
+    "R_knee_pitch_joint", "R_ankle_pitch_joint", "R_ankle_roll_joint",
+    "waist_yaw_joint", "waist_pitch_joint", "waist_roll_joint",
+    "L_shoulder_pitch_joint", "L_shoulder_roll_joint", "L_shoulder_yaw_joint",
+    "L_elbow_pitch_joint", "L_elbow_yaw_joint", "L_wrist_pitch_joint", "L_wrist_roll_joint",
+    "R_shoulder_pitch_joint", "R_shoulder_roll_joint", "R_shoulder_yaw_joint",
+    "R_elbow_pitch_joint", "R_elbow_yaw_joint", "R_wrist_pitch_joint", "R_wrist_roll_joint",
 ]
 
 
@@ -146,7 +160,8 @@ def load_pkl(pkl_path: str, output_fps: int, robot: str) -> dict[str, np.ndarray
 
         # Reorder: DEX_PKL_JOINT_ORDER (29) → ROBOT_JOINT_NAMES[robot] (29)
         target_names = ROBOT_JOINT_NAMES[robot]
-        pkl_idx = {n: i for i, n in enumerate(DEX_PKL_JOINT_ORDER)}
+        source_order = C1_PKL_JOINT_ORDER if robot == "c1" else DEX_PKL_JOINT_ORDER
+        pkl_idx = {n: i for i, n in enumerate(source_order)}
         missing = [n for n in target_names if n not in pkl_idx]
         if missing:
             raise KeyError(f"PKL (joblib) missing joints: {missing}")
@@ -171,11 +186,11 @@ def load_pkl(pkl_path: str, output_fps: int, robot: str) -> dict[str, np.ndarray
         # Auto-detect joint order by DOF count: 29 → Dex, 27 → Pro
         dof_count = dof_raw_in.shape[1]
         if dof_count == 29:
-            pkl_order = DEX_PKL_JOINT_ORDER
+            pkl_order = C1_PKL_JOINT_ORDER if robot == "c1" else DEX_PKL_JOINT_ORDER
         elif dof_count == 27:
             pkl_order = PKL_JOINT_ORDER
         else:
-            raise KeyError(f"PKL has {dof_count} DOF — expected 27 (Pro) or 29 (Dex)")
+            raise KeyError(f"PKL has {dof_count} DOF — expected 27 or 29")
         pkl_idx = {n: i for i, n in enumerate(pkl_order)}
         missing = [n for n in target_names if n not in pkl_idx]
         if missing:
@@ -238,6 +253,7 @@ def convert_single(
         body_quat_w=body_quat_w,
         fps=float(output_fps),
     )
+    report_velocity_anomalies(joint_vel, body_lin_vel_w, body_ang_vel_w, joint_names, output_fps, input_file)
 
     out_path = output_name if output_name.endswith(".npz") else output_name + ".npz"
     np.savez(
@@ -270,7 +286,7 @@ def main():
     parser.add_argument("--raw_output_dir", default=None)
     parser.add_argument("--output_dir",  default=None)
 
-    parser.add_argument("--robot",      default="tienkung2_pro", choices=list(ROBOT_MJCF.keys()), help="Robot type (tienkung2_pro or dex_evt)")
+    parser.add_argument("--robot",      default="c1", choices=list(ROBOT_MJCF.keys()), help="Robot type (c1 or dex_evt)")
     parser.add_argument("--mjcf",       default=None)
     parser.add_argument("--output_fps", type=int, default=50)
 

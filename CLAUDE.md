@@ -38,7 +38,7 @@ bash train_dex.sh medium
 bash train_dex.sh full [motion_npz_or_dir] [num_gpus]
 
 # Inherit weights from a pre-trained model (loads model_state_dict only, no optimizer)
-LOAD_CKPT=policy/wbt_model_46400.pt bash train_dex.sh full
+RESUME=false LOAD_CKPT=policy/dex/wbt_model_46400.pt bash train_dex.sh full
 
 # Resume from a previous run (loads full checkpoint including optimizer)
 RESUME=true bash train_dex.sh full motions/dex.npz 2 run_name model_500.pt

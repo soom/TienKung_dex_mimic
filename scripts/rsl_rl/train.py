@@ -279,8 +279,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # Cross-task checkpoint loading (e.g. standing model from tracking weights)
     if getattr(args_cli, "load_ckpt", None):
         load_path = pathlib.Path(args_cli.load_ckpt).expanduser().resolve()
-        runner.load(load_path)
-        print(f"[INFO]: Loading model checkpoint from: {load_path}")
+        if load_path.is_file():
+            print(f"[INFO]: Loading checkpoint from: {load_path}")
+            loaded = torch.load(str(load_path), map_location=agent_cfg.device, weights_only=False)
+            runner.alg.policy.load_state_dict(
+                loaded["model_state_dict"], strict=False
+            )
+            if runner.empirical_normalization:
+                for key in ("obs_norm_state_dict", "privileged_obs_norm_state_dict"):
+                    if key in loaded:
+                        try:
+                            if key == "obs_norm_state_dict":
+                                runner.obs_normalizer.load_state_dict(loaded[key])
+                            else:
+                                runner.privileged_obs_normalizer.load_state_dict(loaded[key])
+                        except Exception:
+                            print(f"[INFO]: {key} shape mismatch — skipping (fresh normalizer)")
+            print("[INFO]: Checkpoint loaded (model weights only, no optimizer).")
+        else:
+            print(f"[WARNING]: load_ckpt file not found: {load_path}")
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
