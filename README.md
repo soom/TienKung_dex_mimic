@@ -13,6 +13,8 @@ target_joint_pos = reference_joint_pos + action × scale
 
 训练仅使用各机器人的 Simple tracking 环境。推理时分别加载 tracking 模型与预训练 standing 模型，并合并导出双头 ONNX；本项目不提供 standing 模型训练任务。
 
+<video controls width="100%" src="https://github.com/user-attachments/assets/3f8b4aa4-edd3-4b71-be1f-2cdad4333444"></video>
+
 ## 环境要求
 
 - NVIDIA GPU 与 CUDA 驱动
